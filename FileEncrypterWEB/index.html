@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FileEncrypter - Web App</title>
+    <!-- Link to external CSS file -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Link to external JavaScript libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-50 text-gray-800 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-2xl bg-white rounded-xl shadow-lg p-6 md:p-8">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl font-bold text-gray-900">FileEncrypter</h1>
+            <p class="text-gray-500 mt-1">Securely encrypt and decrypt files in your browser.</p>
+        </header>
+
+        <!-- Tabs -->
+        <div class="mb-6 border-b border-gray-200">
+            <nav class="flex -mb-px" aria-label="Tabs">
+                <button id="encrypt-tab-btn" class="tab-button w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm active">Encrypt</button>
+                <button id="decrypt-tab-btn" class="tab-button w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm">Decrypt</button>
+            </nav>
+        </div>
+
+        <!-- Main Content -->
+        <main>
+            <!-- Encryption Panel -->
+            <div id="encrypt-panel">
+                <div id="encrypt-drop-zone" class="file-drop-zone rounded-lg p-8 text-center cursor-pointer mb-4">
+                    <input type="file" id="encrypt-file-input" class="hidden">
+                    <p class="text-gray-500">Drag & drop a file here, or <span class="font-semibold text-indigo-600">click to select</span></p>
+                    <p id="encrypt-file-name" class="mt-2 font-medium text-gray-700"></p>
+                </div>
+
+                <div id="encrypt-password-section">
+                    <label for="encrypt-password" class="block text-sm font-medium text-gray-700">Password</label>
+                    <input type="password" id="encrypt-password" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Enter a strong password">
+                </div>
+
+                <button id="encrypt-btn" class="mt-6 w-full bg-indigo-600 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-300 disabled:cursor-not-allowed" disabled>Encrypt File</button>
+            </div>
+
+            <!-- Decryption Panel -->
+            <div id="decrypt-panel" class="hidden">
+                 <div id="decrypt-drop-zone" class="file-drop-zone rounded-lg p-8 text-center cursor-pointer mb-4">
+                    <input type="file" id="decrypt-file-input" class="hidden">
+                    <p class="text-gray-500">Drag & drop encrypted file, or <span class="font-semibold text-indigo-600">click to select</span></p>
+                    <p id="decrypt-file-name" class="mt-2 font-medium text-gray-700"></p>
+                </div>
+                
+                <div>
+                    <label for="decrypt-password" class="block text-sm font-medium text-gray-700">Password</label>
+                    <input type="password" id="decrypt-password" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Enter your password">
+                </div>
+
+                <button id="decrypt-btn" class="mt-6 w-full bg-indigo-600 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-300 disabled:cursor-not-allowed" disabled>Decrypt File</button>
+            </div>
+            
+             <!-- Status/Result Area -->
+            <div id="status-area" class="mt-6 text-center"></div>
+        </main>
+
+    </div>
+
+    <!-- Link to external JavaScript file -->
+    <script src="script.js"></script>
+</body>
+</html>
