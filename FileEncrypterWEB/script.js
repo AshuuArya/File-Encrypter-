@@ -116,7 +116,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         try {
             const fileBuffer = await encryptFile.arrayBuffer();
-            // Pass the original filename to be embedded in the encrypted file
             const encryptedBlob = await encryptWithPassword(fileBuffer, password, encryptFile.name);
             showSuccess('File encrypted successfully! Your download should begin automatically.');
             createDownloadLink(encryptedBlob, `${encryptFile.name}.encrypted`, 'Encrypted File');
@@ -141,12 +140,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const encryptedBuffer = await decryptFile.arrayBuffer();
-            // The decrypt function now returns the data and the original filename
             const { decryptedBuffer, originalFilename } = await decryptWithPassword(encryptedBuffer, password);
             
             const decryptedBlob = new Blob([decryptedBuffer]);
             showSuccess('File decrypted successfully! Your download should begin automatically.');
-            // Use the restored filename for the download
             createDownloadLink(decryptedBlob, originalFilename, 'Decrypted File');
 
         } catch (error) {
@@ -156,124 +153,55 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Cryptographic Functions (using Web Crypto API) ---
-
-    // Derives a key from a password using PBKDF2.
     async function getKeyFromPassword(password, salt) {
         const enc = new TextEncoder();
-        const keyMaterial = await window.crypto.subtle.importKey(
-            'raw',
-            enc.encode(password),
-            { name: 'PBKDF2' },
-            false,
-            ['deriveKey']
-        );
-        return window.crypto.subtle.deriveKey(
-            {
-                name: 'PBKDF2',
-                salt: salt,
-                iterations: PBKDF2_ITERATIONS,
-                hash: 'SHA-256'
-            },
-            keyMaterial,
-            { name: 'AES-GCM', length: 256 },
-            true,
-            ['encrypt', 'decrypt']
-        );
+        const keyMaterial = await window.crypto.subtle.importKey('raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveKey']);
+        return window.crypto.subtle.deriveKey({ name: 'PBKDF2', salt: salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' }, keyMaterial, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
     }
     
-    // Encrypts data using AES-GCM with a derived password key.
     async function encryptWithPassword(data, password, originalFilename) {
         const salt = window.crypto.getRandomValues(new Uint8Array(SALT_SIZE));
         const key = await getKeyFromPassword(password, salt);
         const iv = window.crypto.getRandomValues(new Uint8Array(IV_SIZE));
-
-        // NEW: Prepare the filename to be embedded
         const filenameBytes = new TextEncoder().encode(originalFilename);
-        const filenameLengthBuffer = new ArrayBuffer(2); // 2 bytes to store filename length
-        new DataView(filenameLengthBuffer).setUint16(0, filenameBytes.length, false); // Big-endian
-
-        const encryptedContent = await window.crypto.subtle.encrypt(
-            { name: 'AES-GCM', iv: iv },
-            key,
-            data
-        );
-
-        // NEW File Format: [SALT][IV][FILENAME_LENGTH][FILENAME_BYTES][ENCRYPTED_DATA]
+        const filenameLengthBuffer = new ArrayBuffer(2);
+        new DataView(filenameLengthBuffer).setUint16(0, filenameBytes.length, false);
+        const encryptedContent = await window.crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, data);
         const encryptedBytes = new Uint8Array(encryptedContent);
-        const result = new Uint8Array(
-            SALT_SIZE + IV_SIZE + 2 + filenameBytes.length + encryptedBytes.length
-        );
-        
+        const result = new Uint8Array(SALT_SIZE + IV_SIZE + 2 + filenameBytes.length + encryptedBytes.length);
         let offset = 0;
-        result.set(salt, offset);
-        offset += salt.length;
-        result.set(iv, offset);
-        offset += iv.length;
-        result.set(new Uint8Array(filenameLengthBuffer), offset);
-        offset += 2;
-        result.set(filenameBytes, offset);
-        offset += filenameBytes.length;
+        result.set(salt, offset); offset += salt.length;
+        result.set(iv, offset); offset += iv.length;
+        result.set(new Uint8Array(filenameLengthBuffer), offset); offset += 2;
+        result.set(filenameBytes, offset); offset += filenameBytes.length;
         result.set(encryptedBytes, offset);
-
         return new Blob([result]);
     }
 
-    // Decrypts data using AES-GCM with a derived password key.
     async function decryptWithPassword(encryptedData, password) {
         const encryptedBytes = new Uint8Array(encryptedData);
-
-        // NEW: Extract all parts from the file based on the new format
         let offset = 0;
-        const salt = encryptedBytes.slice(offset, offset + SALT_SIZE);
-        offset += SALT_SIZE;
-        const iv = encryptedBytes.slice(offset, offset + IV_SIZE);
-        offset += IV_SIZE;
-        
-        const filenameLength = new DataView(encryptedBytes.buffer, offset, 2).getUint16(0, false);
-        offset += 2;
+        const salt = encryptedBytes.slice(offset, offset + SALT_SIZE); offset += SALT_SIZE;
+        const iv = encryptedBytes.slice(offset, offset + IV_SIZE); offset += IV_SIZE;
+        const filenameLength = new DataView(encryptedBytes.buffer, offset, 2).getUint16(0, false); offset += 2;
         const filenameBytes = encryptedBytes.slice(offset, offset + filenameLength);
-        const originalFilename = new TextDecoder().decode(filenameBytes);
-        offset += filenameLength;
-        
+        const originalFilename = new TextDecoder().decode(filenameBytes); offset += filenameLength;
         const data = encryptedBytes.slice(offset);
-
         const key = await getKeyFromPassword(password, salt);
-
-        const decryptedBuffer = await window.crypto.subtle.decrypt(
-            { name: 'AES-GCM', iv: iv },
-            key,
-            data
-        );
-        
-        // Return both the data and the restored filename
+        const decryptedBuffer = await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, key, data);
         return { decryptedBuffer, originalFilename };
     }
 
     // --- UI Helper Functions ---
     function showLoading(message) {
-        statusArea.innerHTML = `
-            <div class="flex flex-col items-center justify-center">
-                <div class="loader mb-2"></div>
-                <p class="text-gray-600">${message}</p>
-            </div>`;
+        statusArea.innerHTML = `<div class="flex flex-col items-center justify-center"><div class="loader mb-2"></div><p>${message}</p></div>`;
     }
-
     function showSuccess(message) {
-        statusArea.innerHTML = `
-            <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded-md" role="alert">
-                <p class="font-bold">Success</p>
-                <p>${message}</p>
-            </div>`;
+        statusArea.innerHTML = `<div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4" role="alert"><p class="font-bold">Success</p><p>${message}</p></div>`;
     }
-
     function showError(message) {
-        statusArea.innerHTML = `
-            <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md" role="alert">
-                <p class="font-bold">Error</p>
-                <p>${message}</p>
-            </div>`;
+        statusArea.innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert"><p class="font-bold">Error</p><p>${message}</p></div>`;
     }
-    
     function createDownloadLink(blob, fileName, label) {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -281,7 +209,6 @@ document.addEventListener('DOMContentLoaded', () => {
         link.download = fileName;
         link.textContent = `Download ${label} Again`;
         link.className = 'block w-full text-center mt-2 bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500';
-        
         let container = document.getElementById('download-links');
         if (!container) {
             container = document.createElement('div');
@@ -289,16 +216,90 @@ document.addEventListener('DOMContentLoaded', () => {
             container.className = 'mt-4 space-y-2';
             statusArea.appendChild(container);
         }
-        
-        // Clear previous links and add the new one
         container.innerHTML = '';
         container.appendChild(link);
-
-        // Programmatically click the link to start the download
         link.click();
     }
-
     function clearStatus() {
         statusArea.innerHTML = '';
     }
+
+    // --- NEW: Dynamic Particle Background Logic ---
+    const canvas = document.getElementById('particle-canvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    class Particle {
+        constructor(x, y, size, speedX, speedY) {
+            this.x = x;
+            this.y = y;
+            this.size = size;
+            this.speedX = speedX;
+            this.speedY = speedY;
+        }
+        update() {
+            if (this.x > canvas.width || this.x < 0) this.speedX = -this.speedX;
+            if (this.y > canvas.height || this.y < 0) this.speedY = -this.speedY;
+            this.x += this.speedX;
+            this.y += this.speedY;
+        }
+        draw() {
+            ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    function initParticles() {
+        particles = [];
+        const numberOfParticles = (canvas.width * canvas.height) / 9000;
+        for (let i = 0; i < numberOfParticles; i++) {
+            const size = Math.random() * 2 + 1;
+            const x = Math.random() * canvas.width;
+            const y = Math.random() * canvas.height;
+            const speedX = (Math.random() * 0.5 - 0.25);
+            const speedY = (Math.random() * 0.5 - 0.25);
+            particles.push(new Particle(x, y, size, speedX, speedY));
+        }
+    }
+
+    function connectParticles() {
+        for (let a = 0; a < particles.length; a++) {
+            for (let b = a; b < particles.length; b++) {
+                const dx = particles[a].x - particles[b].x;
+                const dy = particles[a].y - particles[b].y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < 120) {
+                    ctx.strokeStyle = `rgba(0, 255, 255, ${1 - distance / 120})`;
+                    ctx.lineWidth = 0.5;
+                    ctx.beginPath();
+                    ctx.moveTo(particles[a].x, particles[a].y);
+                    ctx.lineTo(particles[b].x, particles[b].y);
+                    ctx.stroke();
+                }
+            }
+        }
+    }
+
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (const particle of particles) {
+            particle.update();
+            particle.draw();
+        }
+        connectParticles();
+        requestAnimationFrame(animate);
+    }
+
+    initParticles();
+    animate();
 });
